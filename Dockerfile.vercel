@@ -17,7 +17,6 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY composer.json composer.lock ./
 
 # Install dependencies without Laravel scripts
-# artisan is not copied yet, so scripts must be disabled here
 RUN composer install \
     --no-dev \
     --no-interaction \
