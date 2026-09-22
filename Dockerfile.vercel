@@ -1,0 +1,39 @@
+FROM dunglas/frankenphp:1-php8.2-bookworm
+
+WORKDIR /app
+
+# MongoDB PHP extension
+RUN install-php-extensions mongodb
+
+# Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# Install Laravel dependencies
+COPY composer.json composer.lock ./
+
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --prefer-dist \
+    --optimize-autoloader
+
+# Copy project
+COPY . .
+
+# Laravel directories
+RUN mkdir -p \
+    storage/framework/cache \
+    storage/framework/sessions \
+    storage/framework/views \
+    storage/logs \
+    bootstrap/cache
+
+RUN chmod -R 775 storage bootstrap/cache
+
+# Caddy configuration
+RUN printf ':80 {\n    root * /app/public\n    php_server\n}\n' > /etc/frankenphp/Caddyfile
+
+ENV SERVER_NAME=:80
+ENV PORT=80
+
+CMD ["frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile"]
