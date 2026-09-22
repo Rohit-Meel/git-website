@@ -2,27 +2,34 @@ FROM dunglas/frankenphp:1-php8.2-bookworm
 
 WORKDIR /app
 
-# MongoDB PHP extension
+# System packages required by Composer
 RUN apt-get update \
     && apt-get install -y unzip \
     && rm -rf /var/lib/apt/lists/*
 
+# PHP extensions
 RUN install-php-extensions mongodb-1.21.5 zip
 
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Install Laravel dependencies
+# Copy Composer files first for Docker layer caching
 COPY composer.json composer.lock ./
 
+# Install dependencies without Laravel scripts
+# artisan is not copied yet, so scripts must be disabled here
 RUN composer install \
     --no-dev \
     --no-interaction \
     --prefer-dist \
-    --optimize-autoloader
+    --optimize-autoloader \
+    --no-scripts
 
-# Copy project
+# Now copy the complete Laravel project
 COPY . .
+
+# Generate optimized autoload after artisan exists
+RUN composer dump-autoload --optimize
 
 # Laravel directories
 RUN mkdir -p \
@@ -34,11 +41,10 @@ RUN mkdir -p \
 
 RUN chmod -R 775 storage bootstrap/cache
 
-# Caddy configuration
+# FrankenPHP / Caddy
 RUN printf ':80 {\n    root * /app/public\n    php_server\n}\n' > /etc/frankenphp/Caddyfile
 
 ENV SERVER_NAME=:80
 ENV PORT=80
 
 CMD ["frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile"]
-# EXPOSE 80
